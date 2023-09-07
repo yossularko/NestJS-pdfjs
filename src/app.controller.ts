@@ -15,4 +15,9 @@ export class AppController {
   genpdf(@Res({ passthrough: true }) res: Response) {
     return this.appService.genpdf(res);
   }
+
+  @Get('pdf-table')
+  genpdfTable(@Res({ passthrough: true }) res: Response) {
+    return this.appService.genpdfTable(res);
+  }
 }

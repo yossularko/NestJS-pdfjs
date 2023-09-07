@@ -7,6 +7,7 @@ import { Response } from 'express';
 import { createWriteStream, createReadStream } from 'fs';
 import { Document } from 'pdfjs';
 import * as tmp from 'tmp';
+import { loremLong, loremShort } from './lorem';
 
 @Injectable()
 export class AppService {
@@ -61,6 +62,103 @@ export class AppService {
       .add('\nRegular')
       .add('\nBigger', { fontSize: 40 })
       .add('\nRegular');
+
+    await doc.end();
+
+    const file = createReadStream(filePath);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="PdfFile.pdf"`,
+    });
+    return new StreamableFile(file);
+  }
+
+  async genpdfTable(res: Response) {
+    const doc = new Document({
+      font: require('pdfjs/font/Helvetica'),
+      padding: 10,
+    });
+    const filePath = await new Promise<string>((resolve) => {
+      tmp.file(
+        {
+          discardDescriptor: true,
+          prefix: 'MyPdf',
+          postfix: '.pdf',
+          mode: parseInt('0600', 8),
+        },
+        async (err, file) => {
+          if (err) {
+            throw new BadRequestException(err);
+          }
+
+          doc.pipe(createWriteStream(file));
+          resolve(file);
+        },
+      );
+    });
+
+    // render something onto the document
+
+    const footer = doc.footer();
+    footer.pageNumber((curr, total) => `${curr} / ${total}`, {
+      textAlign: 'right',
+      fontSize: 12,
+    });
+
+    doc.header().text('HAS HEADER');
+
+    doc.text(loremLong);
+
+    const table = doc.table({
+      widths: [200, 200],
+      borderWidth: 1,
+    });
+
+    const header = table.header();
+    header.cell('Header Left', { textAlign: 'center', padding: 30 });
+    header.cell('Header Right', { textAlign: 'center', padding: 30 });
+
+    const rowFirst = table.row();
+    rowFirst.cell(loremShort, {
+      fontSize: 15,
+      padding: 10,
+      backgroundColor: 0xdddddd,
+    });
+    rowFirst.cell('Cell 2', {
+      fontSize: 11,
+      padding: 10,
+      backgroundColor: 0xeeeeee,
+    });
+
+    Array(25)
+      .fill('List Row ')
+      .map((item, idx) => {
+        const rowList = table.row();
+        rowList.cell(`${item} ${idx + 1}`, {
+          fontSize: 15,
+          padding: 10,
+          backgroundColor: 0xdddddd,
+        });
+        rowList.cell('Cell 2', {
+          fontSize: 11,
+          padding: 10,
+          backgroundColor: 0xeeeeee,
+        });
+      });
+
+    const rowEnd = table.row();
+    rowEnd.cell('Last row', {
+      fontSize: 15,
+      padding: 10,
+      backgroundColor: 0xdddddd,
+    });
+    rowEnd.cell('Cell 2', {
+      fontSize: 11,
+      padding: 10,
+      backgroundColor: 0xeeeeee,
+    });
+
+    doc.text('Foo');
 
     await doc.end();
 

@@ -4,10 +4,11 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { createWriteStream, createReadStream } from 'fs';
-import { Document } from 'pdfjs';
+import { createWriteStream, createReadStream, readFileSync } from 'fs';
+import { Document, Image } from 'pdfjs';
 import * as tmp from 'tmp';
 import { loremLong, loremShort } from './lorem';
+import { join } from 'path';
 
 @Injectable()
 export class AppService {
@@ -159,6 +160,74 @@ export class AppService {
     });
 
     doc.text('Foo');
+
+    await doc.end();
+
+    const file = createReadStream(filePath);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="PdfFile.pdf"`,
+    });
+    return new StreamableFile(file);
+  }
+
+  async genpdfImg(res: Response) {
+    const doc = new Document({
+      font: require('pdfjs/font/Helvetica'),
+      padding: 10,
+    });
+    const filePath = await new Promise<string>((resolve) => {
+      tmp.file(
+        {
+          discardDescriptor: true,
+          prefix: 'MyPdf',
+          postfix: '.pdf',
+          mode: parseInt('0600', 8),
+        },
+        async (err, file) => {
+          if (err) {
+            throw new BadRequestException(err);
+          }
+
+          doc.pipe(createWriteStream(file));
+          resolve(file);
+        },
+      );
+    });
+
+    // render something onto the document
+
+    const jpegImage = readFileSync(join(__dirname, '..', 'pdfjs.jpg'));
+    const img = new Image(jpegImage);
+
+    doc.image(img, {
+      width: 64,
+      align: 'center',
+      wrap: false,
+      x: 10,
+      y: 30,
+    });
+
+    doc.text(loremShort);
+
+    doc.image(img);
+
+    doc.image(img, {
+      width: 128,
+      align: 'left',
+    });
+
+    doc.image(img, {
+      height: 55,
+      align: 'center',
+    });
+
+    doc.image(img, {
+      width: 128,
+      align: 'right',
+    });
+
+    doc.text(loremShort);
 
     await doc.end();
 

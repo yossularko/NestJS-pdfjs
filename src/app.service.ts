@@ -1,6 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { createWriteStream } from 'fs';
+import {
+  Injectable,
+  BadRequestException,
+  StreamableFile,
+} from '@nestjs/common';
+import { Response } from 'express';
+import { createWriteStream, createReadStream } from 'fs';
 import { Document } from 'pdfjs';
+import * as tmp from 'tmp';
 
 @Injectable()
 export class AppService {
@@ -8,17 +14,39 @@ export class AppService {
     return 'Hello World!';
   }
 
-  async genpdf() {
+  async genpdf(res: Response) {
     const doc = new Document({
       font: require('pdfjs/font/Helvetica'),
       padding: 10,
     });
-    doc.pipe(createWriteStream('output.pdf'));
+    const filePath = await new Promise<string>((resolve) => {
+      tmp.file(
+        {
+          discardDescriptor: true,
+          prefix: 'MyPdf',
+          postfix: '.pdf',
+          mode: parseInt('0600', 8),
+        },
+        async (err, file) => {
+          if (err) {
+            throw new BadRequestException(err);
+          }
+
+          doc.pipe(createWriteStream(file));
+          resolve(file);
+        },
+      );
+    });
 
     // render something onto the document
 
     const text = doc.text();
     text
+      .add('Title' + '\n\n', {
+        underline: true,
+        fontSize: 18,
+        font: require('pdfjs/font/Helvetica-Bold'),
+      })
       .add('Regular')
       .add('Bold', { font: require('pdfjs/font/Helvetica-Bold') })
       .add('Regular', { font: require('pdfjs/font/Helvetica') })
@@ -36,6 +64,11 @@ export class AppService {
 
     await doc.end();
 
-    return 'Success!';
+    const file = createReadStream(filePath);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="PdfFile.pdf"`,
+    });
+    return new StreamableFile(file);
   }
 }

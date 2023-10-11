@@ -238,4 +238,102 @@ export class AppService {
     });
     return new StreamableFile(file);
   }
+
+  async genpdfMix(res: Response) {
+    const doc = new Document({
+      font: require('pdfjs/font/Helvetica'),
+      padding: 10,
+    });
+    const filePath = await new Promise<string>((resolve) => {
+      tmp.file(
+        {
+          discardDescriptor: true,
+          prefix: 'MyPdf',
+          postfix: '.pdf',
+          mode: parseInt('0600', 8),
+        },
+        async (err, file) => {
+          if (err) {
+            throw new BadRequestException(err);
+          }
+
+          doc.pipe(createWriteStream(file));
+          resolve(file);
+        },
+      );
+    });
+
+    // render something onto the document
+
+    const jpegImage = readFileSync(join(__dirname, '..', 'pdfjs.jpg'));
+    const img = new Image(jpegImage);
+
+    const footer = doc.footer();
+    footer.pageNumber((curr, total) => `${curr} / ${total}`, {
+      textAlign: 'right',
+      fontSize: 12,
+    });
+
+    const headerPage = doc.header();
+    headerPage.image(img);
+    headerPage.text('_', { color: 0xffffff });
+
+    doc.text(loremLong);
+
+    const table = doc.table({
+      widths: ['*', '*'],
+      borderWidth: 1,
+    });
+
+    const header = table.header();
+    header.cell('Header Left', {
+      textAlign: 'center',
+      backgroundColor: 0xdddddd,
+      padding: 4,
+    });
+    header.cell('Header Right', {
+      textAlign: 'center',
+      backgroundColor: 0xdddddd,
+      padding: 4,
+    });
+
+    const rowFirst = table.row();
+    rowFirst.cell('Test First', {
+      padding: 4,
+    });
+    rowFirst.cell('Cell 2', {
+      padding: 4,
+    });
+
+    Array(25)
+      .fill('List Row ')
+      .map((item, idx) => {
+        const rowList = table.row();
+        rowList.cell(`${item} ${idx + 1}`, {
+          padding: 4,
+        });
+        rowList.cell('Cell 2', {
+          padding: 4,
+        });
+      });
+
+    const rowEnd = table.row();
+    rowEnd.cell('Last row', {
+      padding: 4,
+    });
+    rowEnd.cell('Cell 2', {
+      padding: 4,
+    });
+
+    doc.text('Foo');
+
+    await doc.end();
+
+    const file = createReadStream(filePath);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="PdfFile.pdf"`,
+    });
+    return new StreamableFile(file);
+  }
 }

@@ -25,4 +25,9 @@ export class AppController {
   genpdfImg(@Res({ passthrough: true }) res: Response) {
     return this.appService.genpdfImg(res);
   }
+
+  @Get('pdf-mix')
+  genpdfMix(@Res({ passthrough: true }) res: Response) {
+    return this.appService.genpdfMix(res);
+  }
 }
